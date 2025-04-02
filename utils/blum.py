@@ -4,6 +4,8 @@ from typing import Literal, Self, Union
 
 import cloudscraper
 
+import config
+
 from .core.logger import logger
 from .payload import create_payload_local
 
@@ -76,7 +78,7 @@ class Blum:
                 if point["symbol"] == symbol:
                     return point["balance"], symbol
 
-    def play_game(self: Self):
+    def play_game(self: Self, timeout: int = 5):
         response = scraper.post(
             "https://game-domain.blum.codes/api/v2/game/play",
             headers={
@@ -89,7 +91,7 @@ class Blum:
 
             game_id = data["gameId"]
             message = (
-                f"User {self.username!r} - Game successfully played <b>{game_id!r}<b>."
+                f"User {self.username!r} - Game successfully played <b>{game_id!r}</b>."
             )
 
             logger.success(message)
@@ -101,18 +103,33 @@ class Blum:
                 f"User {self.username!r} - An error occurred during playing a game!"
             )
 
+            if config.DEBUG:
+                try:
+                    data = response.json()
+                    message = data["message"]
+
+                    logger.warning(f"User {self.username!r} - {message}!")
+                except Exception:
+                    print(response.text)
+
+            logger.info(f"User {self.username!r} - Sleeping about <c>30</c> seconds...")
+            time.sleep(30)
+
+            return self.play_game(timeout - 1)
+
     def start_game(self: Self):
         if game := self.play_game():
-            self.claim_game(
+            if self.claim_game(
                 game["gameId"],
                 int(
                     game["assets"]["CLOVER"]["perClick"],
                 ),
-            )
+            ):
+                return True
 
     def claim_game(self: Self, game_id: str, multiplier: int):
         try:
-            clover = randint(190, 230)
+            clover = randint(250, 280)
             bombs = randint(0, 1) if multiplier >= 3 else 0
             points = clover * multiplier - bombs * 100
             freeze = randint(0, 5)
@@ -139,6 +156,8 @@ class Blum:
                     logger.success(
                         f"User {self.username!r} - Points <b>{points!r}</b> are successfully claimed."
                     )
+
+                    return True
                 else:
                     logger.warning(f"User {self.username!r} - Unable to claim.")
 
@@ -161,19 +180,16 @@ class Blum:
     def main(self: Self) -> None:
         if point := self.get_point("PP"):
             play_passes, symbol = point
+            play_passes = int(play_passes)
             logger.info(
                 f"User {self.username!r} - Have <b>{play_passes}{symbol}</b> play passes!"
             )
 
-            for num in range(int(play_passes)):
-                logger.info(
-                    f"User {self.username!r} - Starting new game with this <c>{num!r}</c> number."
-                )
-                self.start_game()
-                logger.info(
-                    f"User {self.username!r} - Sleeping about <c>2.5</c> seconds..."
-                )
-                time.sleep(2.5)
+            while play_passes:
+                if not self.start_game():
+                    continue
+
+                play_passes -= 1
 
 
 def main() -> None:
