@@ -8,7 +8,6 @@ from .core.logger import logger
 from .payload import create_payload_local
 
 scraper = cloudscraper.create_scraper()  # Create a scraper session
-scraper.requests_kwargs["timeout"] = 32  # Set default timeout to 32 seconds
 
 
 class Blum:
