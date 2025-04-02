@@ -42,7 +42,7 @@ class Blum:
                 self._username: str = me["username"]
 
                 logger.info(
-                    "User {!r} - BP balance is {} {}.".format(
+                    "User {!r} - BP balance is <b>{}{}</b>.".format(
                         self.username, *self.get_point()
                     )
                 )
@@ -84,23 +84,22 @@ class Blum:
             },
         )
 
-        if response.ok:
+        try:
             data = response.json()
 
-            try:
-                game_id = data["gameId"]
-                message = (
-                    f"User {self.username!r} - Game successfully played {game_id!r}."
-                )
+            game_id = data["gameId"]
+            message = (
+                f"User {self.username!r} - Game successfully played <b>{game_id!r}<b>."
+            )
 
-                logger.success(message)
-
-            except Exception:
-                logger.error(
-                    f"User {self.username!r} - An error occurred during playing a game!"
-                )
+            logger.success(message)
 
             return data
+
+        except Exception:
+            logger.error(
+                f"User {self.username!r} - An error occurred during playing a game!"
+            )
 
     def start_game(self: Self):
         if game := self.play_game():
@@ -121,7 +120,11 @@ class Blum:
                 game_id=game_id, clover=clover, freeze=freeze, bombs=bombs
             )
 
-            time.sleep(30 + freeze * 3)
+            sleep = 30 + freeze * 3
+            logger.info(
+                f"User {self.username!r} - Sleeping about <c>{sleep!r}</c> seconds..."
+            )
+            time.sleep(sleep)
 
             response = scraper.post(
                 "https://game-domain.blum.codes/api/v2/game/claim",
@@ -132,11 +135,20 @@ class Blum:
             )
 
             if response.ok:
-                logger.success(
-                    f"User {self.username!r} - Points {points!r} are successfully claimed."
-                )
+                if response.text == "OK":
+                    logger.success(
+                        f"User {self.username!r} - Points <b>{points!r}</b> are successfully claimed."
+                    )
+                else:
+                    logger.warning(f"User {self.username!r} - Unable to claim.")
+
                 logger.info(
-                    "User {!r} - Current BP balance is {} {}.".format(
+                    f"User {self.username!r} - Sleeping about <c>5</c> seconds..."
+                )
+                time.sleep(5)
+
+                logger.info(
+                    "User {!r} - Current BP balance is <b>{}{}</b>.".format(
                         self.username, *self.get_point()
                     )
                 )
@@ -145,6 +157,23 @@ class Blum:
             logger.error(
                 f"User {self.username!r} - Error occurred during claim game: {err}"
             )
+
+    def main(self: Self) -> None:
+        if point := self.get_point("PP"):
+            play_passes, symbol = point
+            logger.info(
+                f"User {self.username!r} - Have <b>{play_passes}{symbol}</b> play passes!"
+            )
+
+            for num in range(int(play_passes)):
+                logger.info(
+                    f"User {self.username!r} - Starting new game with this <c>{num!r}</c> number."
+                )
+                self.start_game()
+                logger.info(
+                    f"User {self.username!r} - Sleeping about <c>2.5</c> seconds..."
+                )
+                time.sleep(2.5)
 
 
 def main() -> None:
