@@ -1,6 +1,6 @@
 import time
 from random import randint
-from typing import Literal, Self, Union
+from typing import Dict, Literal, Self, Union
 
 import cloudscraper
 
@@ -14,28 +14,49 @@ scraper = cloudscraper.create_scraper()  # Create a scraper session
 
 class Blum:
 
-    def __init__(self: Self, web_data: str) -> None:
+    def __init__(self: Self, web_data: str):
         self.web_data: str = web_data
 
-    @property
-    def token(self: Self) -> Union[str, None]:
-        if hasattr(self, "_token"):
-            return self._token
+    def login(self: Self, timeout: int = 5):
+        try:
+            response = scraper.post(
+                url="https://user-domain.blum.codes/api/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP",
+                json={"query": self.web_data},
+            )
 
-        response = scraper.post(
-            url="https://user-domain.blum.codes/api/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP",
-            json={"query": self.web_data},
+            if response.ok:
+                if data := response.json():
+                    token = data["token"]["access"]
+                    return token
+
+        except Exception:
+            logger.error(f"Unable to login!")
+
+            if timeout:
+                time.sleep(5)
+                return self.login(timeout - 1)
+
+    def is_token_valid(self: Self, token: str) -> bool:
+        response = scraper.get(
+            "https://user-domain.blum.codes/api/v1/user/me",
+            headers={"Authorization": f"Bearer {token}"},
         )
 
-        if response.ok:
-            if data := response.json():
-                self._token: str = data["token"]["access"]
+        return True if response.ok else False
 
-                return self._token
+    @property
+    def token(self: Self):
+        if hasattr(self, "_token") and self.is_token_valid(self._token):
+            return self._token
+
+        if token := self.login():
+            self._token = token
+
+            return self._token
 
         logger.error(f"User {self.username!r} - Unable to retrieve token!")
 
-        return None
+        return self.token
 
     @property
     def username(self: Self):
@@ -115,7 +136,8 @@ class Blum:
             logger.info(f"User {self.username!r} - Sleeping about <c>30</c> seconds...")
             time.sleep(30)
 
-            return self.play_game(timeout - 1)
+            if timeout:
+                return self.play_game(timeout - 1)
 
     def start_game(self: Self):
         if game := self.play_game():
@@ -180,7 +202,7 @@ class Blum:
 
         return claimed
 
-    def main(self: Self) -> None:
+    def main(self: Self):
         if point := self.get_point("PP"):
             play_passes, symbol = point
             play_passes = int(play_passes)
@@ -201,7 +223,7 @@ class Blum:
                 time.sleep(2.5)
 
 
-def main() -> None:
+def main():
     pass
 
 
