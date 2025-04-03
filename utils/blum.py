@@ -128,6 +128,7 @@ class Blum:
                 return True
 
     def claim_game(self: Self, game_id: str, multiplier: int):
+        claimed: bool = False
         try:
             clover = randint(250, 280)
             bombs = randint(0, 1) if multiplier >= 3 else 0
@@ -157,7 +158,7 @@ class Blum:
                         f"User {self.username!r} - Points <b>{points!r}</b> are successfully claimed."
                     )
 
-                    return True
+                    claimed = True
                 else:
                     logger.warning(f"User {self.username!r} - Unable to claim.")
 
@@ -177,6 +178,8 @@ class Blum:
                 f"User {self.username!r} - Error occurred during claim game: {err}"
             )
 
+        return claimed
+
     def main(self: Self) -> None:
         if point := self.get_point("PP"):
             play_passes, symbol = point
@@ -190,6 +193,12 @@ class Blum:
                     continue
 
                 play_passes -= 1
+
+                logger.info(
+                    f"User {self.username!r} - Sleeping about <c>2.5</c> seconds..."
+                )
+
+                time.sleep(2.5)
 
 
 def main() -> None:
