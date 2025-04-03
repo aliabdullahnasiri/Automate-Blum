@@ -1,6 +1,6 @@
 import time
 from random import randint
-from typing import Dict, Literal, Self, Union
+from typing import Literal, Self
 
 import cloudscraper
 
@@ -36,7 +36,7 @@ class Blum:
                 time.sleep(5)
                 return self.login(timeout - 1)
 
-    def is_token_valid(self: Self, token: str) -> bool:
+    def is_token_valid(self: Self, token: str):
         response = scraper.get(
             "https://user-domain.blum.codes/api/v1/user/me",
             headers={"Authorization": f"Bearer {token}"},
