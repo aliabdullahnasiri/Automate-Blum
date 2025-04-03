@@ -44,7 +44,7 @@ class Blum:
                 self._username: str = me["username"]
 
                 logger.info(
-                    "User {!r} - BP balance is <b>{}{}</b>.".format(
+                    "User {!r} - BP balance is <c><b>{}{}</b></c>.".format(
                         self.username, *self.get_point()
                     )
                 )
@@ -168,7 +168,7 @@ class Blum:
                 time.sleep(5)
 
                 logger.info(
-                    "User {!r} - Current BP balance is <b>{}{}</b>.".format(
+                    "User {!r} - Current BP balance is <c><b>{}{}</b></c>.".format(
                         self.username, *self.get_point()
                     )
                 )
