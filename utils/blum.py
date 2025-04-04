@@ -1,8 +1,9 @@
 import time
 from random import randint
-from typing import Literal, Self
+from typing import Dict, List, Literal, Self, Union
 
 import cloudscraper
+from rich.console import Console
 
 import config
 
@@ -10,6 +11,7 @@ from .core.logger import logger
 from .payload import create_payload_local
 
 scraper = cloudscraper.create_scraper()  # Create a scraper session
+console: Console = Console()
 
 
 class Blum:
@@ -22,6 +24,7 @@ class Blum:
             response = scraper.post(
                 url="https://user-domain.blum.codes/api/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP",
                 json={"query": self.web_data},
+                timeout=25,
             )
 
             if response.ok:
@@ -40,6 +43,7 @@ class Blum:
         response = scraper.get(
             "https://user-domain.blum.codes/api/v1/user/me",
             headers={"Authorization": f"Bearer {token}"},
+            timeout=25,
         )
 
         return True if response.ok else False
@@ -50,7 +54,7 @@ class Blum:
             return self._token
 
         if token := self.login():
-            self._token = token
+            self._token: str = token
 
             return self._token
 
@@ -77,6 +81,7 @@ class Blum:
         response = scraper.get(
             "https://user-domain.blum.codes/api/v1/user/me",
             headers={"Authorization": f"Bearer {self.token}"},
+            timeout=25,
         )
 
         if response.ok:
@@ -86,6 +91,7 @@ class Blum:
         response = scraper.get(
             f"https://wallet-domain.blum.codes/api/v1/wallet/my/points/balance",
             headers={"Authorization": f"Bearer {self.token}"},
+            timeout=25,
         )
 
         if response.ok:
@@ -105,6 +111,7 @@ class Blum:
             headers={
                 "Authorization": f"Bearer {self.token}",
             },
+            timeout=25,
         )
 
         try:
@@ -140,14 +147,30 @@ class Blum:
                 return self.play_game(timeout - 1)
 
     def start_game(self: Self):
-        if game := self.play_game():
-            if self.claim_game(
-                game["gameId"],
-                int(
-                    game["assets"]["CLOVER"]["perClick"],
-                ),
-            ):
-                return True
+        if point := self.get_point("PP"):
+            play_passes, symbol = point
+            play_passes = int(play_passes)
+            logger.info(
+                f"User {self.username!r} - Have <b>{play_passes}{symbol}</b> play passes!"
+            )
+
+            while play_passes:
+                if game := self.play_game():
+                    if not self.claim_game(
+                        game["gameId"],
+                        int(
+                            game["assets"]["CLOVER"]["perClick"],
+                        ),
+                    ):
+                        continue
+
+                play_passes -= 1
+
+                logger.info(
+                    f"User {self.username!r} - Sleeping about <c>2.5</c> seconds..."
+                )
+
+                time.sleep(2.5)
 
     def claim_game(self: Self, game_id: str, multiplier: int):
         claimed: bool = False
@@ -172,6 +195,7 @@ class Blum:
                 headers={
                     "Authorization": f"Bearer {self.token}",
                 },
+                timeout=25,
             )
 
             if response.ok:
@@ -202,25 +226,168 @@ class Blum:
 
         return claimed
 
-    def main(self: Self):
-        if point := self.get_point("PP"):
-            play_passes, symbol = point
-            play_passes = int(play_passes)
-            logger.info(
-                f"User {self.username!r} - Have <b>{play_passes}{symbol}</b> play passes!"
+    def get_tasks(
+        self: Self,
+        status: Union[
+            Literal[
+                "READY_FOR_VERIFY",
+                "READY_FOR_CLAIM",
+                "FINISHED",
+                "NOT_STARTED",
+                "STARTED",
+            ],
+            None,
+        ] = None,
+        validation_type: Union[Literal["DEFAULT", "KEYWORD"], None] = None,
+    ):
+        try:
+            response = scraper.get(
+                "https://earn-domain.blum.codes/api/v1/tasks",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                },
+                timeout=25,
             )
 
-            while play_passes:
-                if not self.start_game():
+            if response.ok:
+                __tasks__: List = []
+                tasks = []
+
+                for section in response.json():
+                    tasks.extend(section["tasks"])
+                    tasks.extend(section["subSections"])
+
+                for task in tasks:
+                    try:
+                        __tasks__.extend(task["tasks"])
+                    except Exception:
+                        __tasks__.append(task)
+
+                return [
+                    i
+                    for i in filter(
+                        lambda item: (
+                            item["status"] == status if status is not None else True
+                        )
+                        and (
+                            item["validationType"] == validation_type
+                            if validation_type is not None
+                            else True
+                        ),
+                        __tasks__,
+                    )
+                ]
+        except Exception as err:
+            if config.DEBUG:
+                console.print(err)
+
+    def start_task(self: Self, identity: str):
+        try:
+            response = scraper.post(
+                f"https://earn-domain.blum.codes/api/v1/tasks/{identity}/start",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                },
+                timeout=25,
+            )
+
+            if config.DEBUG:
+                console.print(response.text)
+
+            if response.ok:
+                logger.success(f"User {self.username!r} - Task successfully started.")
+
+                return response.json()
+
+        except Exception:
+            logger.error(
+                f"User {self.username!r} - An error occurred during starting the task!"
+            )
+
+    def validate_task(self: Self, identity: str, data: Union[Dict, None] = None):
+        try:
+            kwargs: Dict = {
+                "headers": {
+                    "Authorization": f"Bearer {self.token}",
+                },
+                "timeout": 25,
+            }
+
+            if data:
+                kwargs.setdefault("json", data)
+
+            response = scraper.post(
+                f"https://earn-domain.blum.codes/api/v1/tasks/{identity}/validate",
+                **kwargs,
+            )
+
+            if config.DEBUG:
+                console.print(response.text)
+
+            if response.ok:
+                logger.success(f"User {self.username!r} - Task successfully validated.")
+
+                return response.json()
+
+        except Exception:
+            logger.error(
+                f"User {self.username} - An error occurred during validating the task!"
+            )
+
+    def claim_task(self: Self, identity: str):
+        try:
+            response = scraper.post(
+                f"https://earn-domain.blum.codes/api/v1/tasks/{identity}/claim",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                },
+                timeout=25,
+            )
+
+            if config.DEBUG:
+                console.print(response.text)
+
+            if response.ok:
+                logger.success(f"User {self.username!r} - Task successfully claimed.")
+
+                return True
+
+        except Exception:
+            logger.error(
+                f"User {self.username} - An error occurred during claiming the task!"
+            )
+
+    def complete_tasks(self: Self):
+
+        if tasks := self.get_tasks():
+            for task in tasks:
+                identity = task["id"]
+                status = task["status"]
+                validation_type = task["validationType"]
+
+                if status == "FINISHED":
                     continue
 
-                play_passes -= 1
+                self.start_task(identity)
 
-                logger.info(
-                    f"User {self.username!r} - Sleeping about <c>2.5</c> seconds..."
-                )
+                if validation_type == "KEYWORD":
+                    for value in (
+                        scraper.get(config.KEYWORDS_URL, timeout=25).json().values()
+                    ):
+                        keyword = value["keyword"]
+                        if self.validate_task(identity, {"keyword": keyword}):
+                            break
+                else:
+                    self.validate_task(identity)
 
-                time.sleep(2.5)
+                self.claim_task(identity)
+
+    def main(self: Self):
+        if config.PLAY_GAME:
+            self.start_game()
+
+        if config.COMPLETE_TASKS:
+            self.complete_tasks()
 
 
 def main():
