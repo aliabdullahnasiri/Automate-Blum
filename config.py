@@ -1,5 +1,3 @@
-import os
-
 # if you need play in the game
 PLAY_GAME = True
 
@@ -9,4 +7,11 @@ POINTS = [240, 280]
 # True - if need shuffle tasks or else - False
 SHUFFLE_TASKS = False
 
-DEBUG: bool = True
+# True - if you want to complete tasks
+COMPLETE_TASKS: bool = True
+
+# True - if you want to program log more information
+DEBUG: bool = False
+
+# The keywords URL
+KEYWORDS_URL: str = "https://automate-blum-default-rtdb.firebaseio.com/keywords.json"
