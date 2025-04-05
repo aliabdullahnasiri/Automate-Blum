@@ -383,11 +383,11 @@ class Blum:
                 self.claim_task(identity)
 
     def main(self: Self):
-        if config.PLAY_GAME:
-            self.start_game()
-
         if config.COMPLETE_TASKS:
             self.complete_tasks()
+
+        if config.PLAY_GAME:
+            self.start_game()
 
 
 def main():
